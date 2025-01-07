@@ -5,3 +5,4 @@ cufflinks == 0.17.3
 plotly == 5.18.0
 scipy == 1.9.1
 streamlit == 1.39.0
+financetooklit == 1.6.4
