@@ -9,18 +9,23 @@ import cufflinks as cf
 from plotly.offline import iplot
 import datetime 
 from scipy.stats import norm
+from financetoolkit import Toolkit
 
 
 cf.go_offline()
 
 st.set_page_config("Stock Dashboard", page_icon="📈")
-st.sidebar.image("stock_png.png")
+st.sidebar.image("logo transparent.png")
 st.sidebar.title("Stock Dashboard")
 
 if "dataframe" not in st.session_state:
     st.session_state["dataframe"] = None
-
-decision = st.sidebar.radio("Do you want to:", ["Upload your own dataframe", "Automatically download data"])
+    
+if "ticker" not in st.session_state:
+    st.session_state["ticker"] = None
+    
+if "start_date" not in st.session_state:
+    st.session_state["start_date"] = None
 
 @st.cache_data
 def load_data(ticker, start_date, end_date):
@@ -35,38 +40,34 @@ def plot_raw_data(df):
     fig.layout.update(title_text="Stock Time Series Data", xaxis_rangeslider_visible=True)
     st.plotly_chart(fig)    
 
-if decision == "Upload your own dataframe":
-    file = st.sidebar.file_uploader("Upload stock historical data, with columns Open, High, Low, Close, Adj Close, and Volume ")
-    if file: 
-        df = pd.read_csv(file)
-        st.session_state["dataframe"] = df
-elif decision == "Automatically download data":
-    with st.sidebar.form("my form"):
-        st.write("Find your preferred stock by entering the following info")
-        ticker = st.text_input("ticker symbol", key="t")
-        start_date = st.text_input("start date in the format YYYY-MM-DD", key="sd")
-        end_date = st.text_input("end date in the format YYYY-MM-DD", key="ed")
-        submitted = st.form_submit_button("submit")
-        if submitted:
-            try:
-                df = load_data(ticker, start_date, end_date)
-                st.session_state["dataframe"] = df
-            except ValueError:
-                st.write("wrong input, try again")
-            except Exception:
-                st.write("invalid ticker entered")
-                
-            if df.empty:
-                st.error("wrong date format or invalid ticker entered, try again")
-            else:
-                st.info("download complete")
+with st.sidebar.form("my form"):
+    st.write("Find your preferred stock by entering the following info")
+    ticker = st.text_input("ticker symbol (in all caps)", key="t")
+    st.session_state["ticker"] = ticker
+    start_date = st.text_input("start date in the format YYYY-MM-DD", key="sd")
+    st.session_state["start_date"] = start_date
+    end_date = st.text_input("end date in the format YYYY-MM-DD", key="ed")
+    submitted = st.form_submit_button("download")
+    if submitted:
+        try:
+            df = load_data(ticker, start_date, end_date)
+            st.session_state["dataframe"] = df
+        except ValueError:
+            st.write("wrong input, try again")
+        except Exception:
+            st.write("invalid ticker entered")
+            
+        if df.empty:
+            st.error("wrong date format or invalid ticker entered, try again")
+        else:
+            st.info("download complete")
 
 if st.sidebar.button("clear file", type="primary"):
     st.session_state["dataframe"] = None 
 
-choice = st.sidebar.radio("Select what you want to do:", ["look at technical indicators", "technical analysis", "forecast"])
+choice = st.sidebar.radio("Select what you want to do:", ["technical indicators", "fundamental analysis", "forecast"])
 
-if choice == "look at technical indicators":
+if choice == "technical indicators":
     st.title("Technical Indicators")
     
     volume_flag = st.checkbox(label="Add Volume")
@@ -109,8 +110,38 @@ if choice == "look at technical indicators":
         fig = qf.iplot(asFigure=True)
         st.plotly_chart(fig)
     
-elif choice == "technical analysis":
-    st.title("Technical Analysis")
+elif choice == "fundamental analysis":
+    st.title("Fundamental Analysis")
+
+    companies = Toolkit(
+        tickers=[st.session_state["ticker"]],
+        api_key=st.secrets["FMP_API_KEY"],
+        start_date=st.session_state["start_date"]
+    )
+    
+    income_statement = companies.get_income_statement()
+    st.header("Income Statement")
+    st.write(income_statement)
+    
+    profitability_ratios = companies.ratios.collect_profitability_ratios()
+    st.header("Profitability Ratios")
+    st.write(profitability_ratios)
+    
+    efficiency_ratios = companies.ratios.collect_efficiency_ratios()
+    st.header("Efficiency Ratios")
+    st.write(efficiency_ratios)
+    
+    liquidity_ratios = companies.ratios.collect_liquidity_ratios()
+    st.header("Liquidity Ratios")
+    st.write(liquidity_ratios)
+    
+    solvency_ratios = companies.ratios.collect_solvency_ratios()
+    st.header("Solvency Ratios")
+    st.write(solvency_ratios)
+    
+    valuation_ratios = companies.ratios.collect_valuation_ratios()
+    st.header("Valuation Ratios")
+    st.write(valuation_ratios)
 
 elif choice == "forecast":
     st.title("Stock Forecasting")
