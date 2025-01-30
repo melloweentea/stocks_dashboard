@@ -10,7 +10,11 @@ from plotly.offline import iplot
 import datetime 
 from scipy.stats import norm
 from financetoolkit import Toolkit
-
+import re
+from bs4 import BeautifulSoup
+from nltk.sentiment import SentimentIntensityAnalyzer
+import requests
+from newsapi import NewsApiClient
 
 cf.go_offline()
 
@@ -39,7 +43,20 @@ def plot_raw_data(df):
     fig.add_trace(go.Scatter(x=df["Date"], y=df["Close"], name="stock close"))
     fig.layout.update(title_text="Stock Time Series Data", xaxis_rangeslider_visible=True)
     st.plotly_chart(fig)    
+    
+def get_company_name(ticker):
+    url = f"https://query2.finance.yahoo.com/v1/finance/search?q={ticker}"
+    headers = {"User-Agent": "Mozilla/5.0"}
+    
+    response = requests.get(url, headers=headers)
+    if response.status_code == 200:
+        data = response.json()
+        if "quotes" in data and len(data["quotes"]) > 0:
+            return data["quotes"][0].get("longname", "Company name not found")
+    return "Company name not found"
 
+def remove_co_ltd(company_name):
+    return re.sub(r'\s*Co\., Ltd\.$', '', company_name)
 with st.sidebar.form("my form"):
     st.write("Find your preferred stock by entering the following info")
     ticker = st.text_input("ticker symbol (in all caps)", key="t")
@@ -65,7 +82,7 @@ with st.sidebar.form("my form"):
 if st.sidebar.button("clear file", type="primary"):
     st.session_state["dataframe"] = None 
 
-choice = st.sidebar.radio("Select what you want to do:", ["technical indicators", "fundamental analysis", "forecast"])
+choice = st.sidebar.radio("Select what you want to do:", ["technical indicators", "fundamental analysis", "forecast", "sentiment analysis"])
 
 if choice == "technical indicators":
     st.title("Technical Indicators")
@@ -215,4 +232,48 @@ elif choice == "forecast":
         fig.layout.update(title_text="Monte Carlo Predictions", xaxis_rangeslider_visible=True)
         st.plotly_chart(fig)    
 
+elif choice == "sentiment analysis":
+    st.title("Sentiment Analysis")
+    company_name = get_company_name(st.session_state["ticker"])
+    company_name = remove_co_ltd(company_name)
+    # print(company_name)
+
+    newsapi = NewsApiClient(api_key=st.secrets["NEWS_API_KEY"])
+
+    news = newsapi.get_everything(q=company_name, language='en', sort_by='relevancy')
+    #VADER
+    # analyzer = SentimentIntensityAnalyzer()
+    #HUGGGINGFACE
+    # sentiment_pipeline = pipeline("sentiment-analysis", device="mps")
+    #nltk 
+    sia = SentimentIntensityAnalyzer()
+    st.header(company_name)
+    st.info(f"Number of articles found: {news['totalResults']}")
+    if news["totalResults"] == 0:
+        st.error("No news articles found")
+    else:
+        for article in news["articles"]:
+            with st.expander(f"Article: {article['title']}", expanded=True):
+                st.subheader(article["title"])
+                st.markdown(f"**Description**: {article['description']}")
+                st.markdown(f"**Content preview**: {article['content']}")
+                st.link_button("Link to article", article["url"])
+                
+                html_text = requests.get(article["url"]).text
+                soup = BeautifulSoup(html_text, "html.parser") 
+                text = soup.get_text()
+                #VADER
+                # score = analyzer.polarity_scores(article["content"])
+                #HUGGINGFACE
+                # result = sentiment_pipeline(text)
+                # print(result)
+                #NLTK 
+                score = sia.polarity_scores(text)
+                if score["compound"] < 0:
+                    st.error("negative")
+                elif score["compound"] == 0:
+                    st.warning("neutral")
+                else:
+                    st.success("positive")
+            
     
