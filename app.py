@@ -12,6 +12,7 @@ from scipy.stats import norm
 from financetoolkit import Toolkit
 import re
 from bs4 import BeautifulSoup
+import nltk
 from nltk.sentiment import SentimentIntensityAnalyzer
 import requests
 from newsapi import NewsApiClient
@@ -246,6 +247,7 @@ elif choice == "sentiment analysis":
     #HUGGGINGFACE
     # sentiment_pipeline = pipeline("sentiment-analysis", device="mps")
     #nltk 
+    nltk.download('vader_lexicon')
     sia = SentimentIntensityAnalyzer()
     st.header(company_name)
     st.info(f"Number of articles found: {news['totalResults']}")
