@@ -18,6 +18,7 @@ import requests
 from newsapi import NewsApiClient
 
 cf.go_offline()
+# st.cache_data.clear()
 
 st.set_page_config("Stock Dashboard", page_icon="📈")
 st.sidebar.image("logo transparent.png")
@@ -36,6 +37,7 @@ if "start_date" not in st.session_state:
 def load_data(ticker, start_date, end_date):
     df = yf.download(ticker, start_date, end_date)
     df.reset_index(inplace=True)
+    df.columns = df.columns.droplevel(1)  # Drop the second level (Ticker)
     return df 
 
 def plot_raw_data(df):
@@ -58,6 +60,7 @@ def get_company_name(ticker):
 
 def remove_co_ltd(company_name):
     return re.sub(r'\s*Co\., Ltd\.$', '', company_name)
+
 with st.sidebar.form("my form"):
     st.write("Find your preferred stock by entering the following info")
     ticker = st.text_input("ticker symbol (in all caps)", key="t")
@@ -201,7 +204,7 @@ elif choice == "forecast":
     
     if st.session_state["dataframe"] is not None:
         df = st.session_state["dataframe"]
-        log_return = np.log(1 + df["Adj Close"].pct_change())
+        log_return = np.log(1 + df["Close"].pct_change())
         
         u = log_return.mean()
         var = log_return.var()
@@ -214,7 +217,7 @@ elif choice == "forecast":
         daily_returns = np.exp(drift + stdev * Z)
             
         price_paths = np.zeros_like(daily_returns)
-        price_paths[0] = df["Adj Close"].iloc[-1]
+        price_paths[0] = df["Close"].iloc[-1]
         for t in range(1, days):
             price_paths[t] = price_paths[t-1] * daily_returns[t]
         
