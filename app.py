@@ -16,6 +16,8 @@ import nltk
 from nltk.sentiment import SentimentIntensityAnalyzer
 import requests
 from newsapi import NewsApiClient
+from openai import OpenAI
+from langchain_core.messages import HumanMessage, AIMessage
 
 cf.go_offline()
 # st.cache_data.clear()
@@ -23,6 +25,9 @@ cf.go_offline()
 st.set_page_config("Stock Dashboard", page_icon="📈")
 st.sidebar.image("logo transparent.png")
 st.sidebar.title("Stock Dashboard")
+
+#initialize chatbot client
+client = OpenAI(api_key=st.secrets["DEEPSEEK_API_KEY"], base_url="https://api.deepseek.com")
 
 if "dataframe" not in st.session_state:
     st.session_state["dataframe"] = None
@@ -32,6 +37,12 @@ if "ticker" not in st.session_state:
     
 if "start_date" not in st.session_state:
     st.session_state["start_date"] = None
+    
+if "chat_history" not in st.session_state:
+    st.session_state.chat_history = []
+    
+if "user_query" not in st.session_state:
+    st.session_state.user_query = ""
 
 @st.cache_data
 def load_data(ticker, start_date, end_date):
@@ -61,6 +72,22 @@ def get_company_name(ticker):
 def remove_co_ltd(company_name):
     return re.sub(r'\s*Co\., Ltd\.$', '', company_name)
 
+def get_response(user_input):
+    response = client.chat.completions.create(
+        model="deepseek-chat",
+        messages=[
+            {"role": "system", "content": "You are a helpful assistant on a stock analysis website"},
+            {"role": "user", "content": user_input},
+        ],
+        stream=True
+    )
+    return response
+    # return response.choices[0].message.content
+
+def stream_response(response):
+    for chunk in response:
+        yield chunk.choices[0].delta.content
+
 with st.sidebar.form("my form"):
     st.write("Find your preferred stock by entering the following info")
     ticker = st.text_input("ticker symbol (in all caps)", key="t")
@@ -86,7 +113,7 @@ with st.sidebar.form("my form"):
 if st.sidebar.button("clear file", type="primary"):
     st.session_state["dataframe"] = None 
 
-choice = st.sidebar.radio("Select what you want to do:", ["technical indicators", "fundamental analysis", "forecast", "sentiment analysis"])
+choice = st.sidebar.radio("Select what you want to do:", ["technical indicators", "fundamental analysis", "forecast", "sentiment analysis", "chatbot"])
 
 if choice == "technical indicators":
     st.title("Technical Indicators")
@@ -280,5 +307,27 @@ elif choice == "sentiment analysis":
                     st.warning("neutral")
                 else:
                     st.success("positive")
+
+elif choice == "chatbot":
+    st.title("Chatbot")
+    # for message in st.session_state.chat_history:
+    #     if isinstance(message, HumanMessage):
+    #         with st.chat_message("Human"):
+    #             st.markdown(message.content)
+    #     else:
+    #         with st.chat_message("AI"):
+    #             st.markdown(message.content)
+            
+    user_query = st.chat_input("Your question")
+    if user_query is not None and user_query != "":
+        # st.session_state.chat_history.append(HumanMessage(user_query))
+    
+        with st.chat_message("Human"):
+            st.markdown(user_query)
+            st.session_state.user_query = user_query
+            
+        with st.chat_message("AI"):
+            ai_response = st.write_stream(stream_response(get_response(user_query)))
+        # st.session_state.chat_history.append(AIMessage(ai_response))
             
     
