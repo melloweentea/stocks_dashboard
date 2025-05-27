@@ -18,6 +18,9 @@ import requests
 from newsapi import NewsApiClient
 from openai import OpenAI
 from langchain_core.messages import HumanMessage, AIMessage
+from google import genai
+from google.genai import types
+import os 
 
 cf.go_offline()
 # st.cache_data.clear()
@@ -113,7 +116,7 @@ with st.sidebar.form("my form"):
 if st.sidebar.button("clear file", type="primary"):
     st.session_state["dataframe"] = None 
 
-choice = st.sidebar.radio("Select what you want to do:", ["technical indicators", "fundamental analysis", "forecast", "sentiment analysis", "chatbot"])
+choice = st.sidebar.radio("Select what you want to do:", ["technical indicators", "fundamental analysis", "forecast", "sentiment analysis", "chatbot", "image analysis"])
 
 if choice == "technical indicators":
     st.title("Technical Indicators")
@@ -281,6 +284,9 @@ elif choice == "sentiment analysis":
     sia = SentimentIntensityAnalyzer()
     st.header(company_name)
     st.info(f"Number of articles found: {news['totalResults']}")
+    pos_count = 0
+    neg_count = 0
+    
     if news["totalResults"] == 0:
         st.error("No news articles found")
     else:
@@ -303,10 +309,12 @@ elif choice == "sentiment analysis":
                 score = sia.polarity_scores(text)
                 if score["compound"] < 0:
                     st.error("negative")
+                    neg_count += 1
                 elif score["compound"] == 0:
                     st.warning("neutral")
                 else:
                     st.success("positive")
+                    pos_count += 1
 
 elif choice == "chatbot":
     st.title("Chatbot")
@@ -330,4 +338,28 @@ elif choice == "chatbot":
             ai_response = st.write_stream(stream_response(get_response(user_query)))
         # st.session_state.chat_history.append(AIMessage(ai_response))
             
+elif choice == "image analysis":
+    st.title("Image Analysis")
+    input_img = st.file_uploader("Upload an image of a stock graph needed to be analysed", type=["jpg", "jpeg", "png"], accept_multiple_files=False)
     
+    client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
+    
+    if input_img is not None:
+        st.image(input_img)
+        img_name = input_img.name
+        img_extension = os.path.splitext(img_name)[1]
+        bytes_data = input_img.getvalue()
+        with st.spinner(text="Analysing..."): 
+
+            response = client.models.generate_content(
+            model='gemini-2.0-flash',
+            contents=[
+                types.Part.from_bytes(
+                data=bytes_data,
+                mime_type=f'image/{img_extension}',
+                ),
+                '''Describe the stock trend in the picture and predict the trend in the near future. 
+                Recommend to the user whether to buy, sell, strong buy or strong sell in the short-term, mid-term and long-term.'''
+            ]
+            )
+        st.markdown(response.text)
