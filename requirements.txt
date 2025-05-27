@@ -11,3 +11,4 @@ beautifulsoup4 == 4.11.2
 nltk == 3.8.1
 st-supabase-connection == 2.0.1
 google-genai == 1.16.1
+openai == 1.69.0
