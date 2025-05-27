@@ -1,6 +1,6 @@
 numpy == 1.24.4
 prophet == 1.1.6
-yfinance == 0.2.54
+yfinance == 0.2.61
 cufflinks == 0.17.3
 plotly == 5.18.0
 scipy == 1.9.1
