@@ -21,6 +21,7 @@ from langchain_core.messages import HumanMessage, AIMessage
 from google import genai
 from google.genai import types
 import os 
+import ast 
 
 cf.go_offline()
 # st.cache_data.clear()
@@ -91,12 +92,23 @@ def stream_response(response):
     for chunk in response:
         yield chunk.choices[0].delta.content
 
+with open("yhallsym.txt", "r", encoding="utf-8") as f:
+    content = f.read()
+
+try:
+    data = ast.literal_eval(content)  # safely evaluate as Python dict
+    tickers = list(data.keys())
+except Exception as e:
+    print("Failed to parse:", e)
+
 with st.sidebar.form("my form"):
     st.write("Find your preferred stock by entering the following info")
-    ticker = st.text_input("ticker symbol (in all caps)", key="t")
-    st.session_state["ticker"] = ticker
+    ticker = st.selectbox("ticker symbol (in all caps)", tickers, index=None)
+    if ticker is not None:
+        st.session_state["ticker"] = ticker 
     start_date = st.text_input("start date in the format YYYY-MM-DD", key="sd")
-    st.session_state["start_date"] = start_date
+    if start_date is not None:
+        st.session_state["start_date"] = start_date
     end_date = st.text_input("end date in the format YYYY-MM-DD", key="ed")
     submitted = st.form_submit_button("download")
     if submitted:
@@ -282,7 +294,10 @@ elif choice == "sentiment analysis":
     #nltk 
     nltk.download('vader_lexicon')
     sia = SentimentIntensityAnalyzer()
+    
     st.header(company_name)
+    summary_placeholder = st.empty()
+    
     st.info(f"Number of articles found: {news['totalResults']}")
     pos_count = 0
     neg_count = 0
@@ -316,6 +331,12 @@ elif choice == "sentiment analysis":
                     st.success("positive")
                     pos_count += 1
 
+    summary_placeholder.markdown(f"""
+    ### Sentiment Summary  
+    - ✅ Positive articles: **{pos_count}**  
+    - ❌ Negative articles: **{neg_count}**  
+    - 🟡 Neutral/Other articles: **{news["totalResults"] - (pos_count + neg_count)}**    
+    """)
 elif choice == "chatbot":
     st.title("Chatbot")
     # for message in st.session_state.chat_history:
